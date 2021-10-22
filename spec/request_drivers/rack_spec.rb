@@ -233,7 +233,7 @@ describe ApiAuth::RequestDrivers::RackRequest do
         )
       end
 
-      context 'when calculated matches sent' do
+      context 'when calculated matches sent as SHA256' do
         before do
           request.env['X-Authorization-Content-SHA256'] = 'JsYKYdAdtYNspw/v1EpqAWYgQTyO9fJZpsVhLU9507g='
         end
@@ -243,9 +243,31 @@ describe ApiAuth::RequestDrivers::RackRequest do
         end
       end
 
-      context "when calculated doesn't match sent" do
+      context 'when calculated matches sent as MD5' do
         before do
-          request.env['X-Authorization-Content-SHA256'] = '3'
+          request.env['X-Authorization-Content-SHA256'] = nil
+          request.env['Content-MD5'] = 'kZXQvrKoieG+Be1rsZVINw=='
+        end
+
+        it 'is false' do
+          expect(driven_request.content_hash_mismatch?).to be false
+        end
+      end
+
+      context "when calculated doesn't match sent as SHA256" do
+        before do
+          request.env['X-Authorization-Content-SHA256'] = 'kZXQvrKoieG+Be1rsZVINw=='
+        end
+
+        it 'is true' do
+          expect(driven_request.content_hash_mismatch?).to be true
+        end
+      end
+
+      context "when calculated doesn't match sent as MD5" do
+        before do
+          request.env['X-Authorization-Content-SHA256'] = nil
+          request.env['Content-MD5'] = 'JsYKYdAdtYNspw/v1EpqAWYgQTyO9fJZpsVhLU9507g='
         end
 
         it 'is true' do

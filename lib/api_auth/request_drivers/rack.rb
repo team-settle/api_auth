@@ -15,14 +15,22 @@ module ApiAuth
         @request
       end
 
+      def request_body
+        @request_body ||= if @request.body
+                            body = @request.body.read
+                            @request.body.rewind
+                            body
+                          else
+                            ''
+                          end
+      end
+
       def calculated_hash
-        if @request.body
-          body = @request.body.read
-          @request.body.rewind
-        else
-          body = ''
-        end
-        sha256_base64digest(body)
+        sha256_base64digest(request_body)
+      end
+
+      def calculated_md5
+        md5_base64digest(request_body)
       end
 
       def populate_content_hash
@@ -33,10 +41,17 @@ module ApiAuth
       end
 
       def content_hash_mismatch?
-        if %w[POST PUT].include?(@request.request_method)
-          calculated_hash != content_hash
+        return false unless %w[POST PUT].include?(@request.request_method)
+
+        !content_hash_matches?
+      end
+
+      def content_hash_matches?
+        request_hash = content_hash
+        if @legacy_header
+          calculated_md5 == request_hash
         else
-          false
+          calculated_hash == request_hash
         end
       end
 
@@ -53,7 +68,14 @@ module ApiAuth
       end
 
       def content_hash
-        find_header(%w[X-AUTHORIZATION-CONTENT-SHA256 X_AUTHORIZATION_CONTENT_SHA256 HTTP_X_AUTHORIZATION_CONTENT_SHA256])
+        sha_hash = find_header(%w[X-AUTHORIZATION-CONTENT-SHA256 X_AUTHORIZATION_CONTENT_SHA256 HTTP_X_AUTHORIZATION_CONTENT_SHA256])
+        if sha_hash
+          @legacy_header = false
+          sha_hash
+        else
+          @legacy_header = true
+          find_header(%w[CONTENT-MD5 CONTENT_MD5 HTTP_CONTENT_MD5])
+        end
       end
 
       def original_uri
